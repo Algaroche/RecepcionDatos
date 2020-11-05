@@ -31,25 +31,21 @@ import random
 import threading
 import time
 
-def producer(queue, event):
+def producer(queue, event, ser):
     """Pretend we're getting a number from the network."""
     while not event.is_set():
-        with Serial('COM31', baudrate = 1500000, timeout = 1) as ser:
-            ser.set_buffer_size(rx_size = 100_000, tx_size = 100_000)
-            
-            usbData = ser.read(4)
-            message = ' '.join(f'0x{bytes:x}' for bytes in usbData)
-            logging.info("Producer got message: %s", message)
-            queue.put(message)
+        usbData = ser.read(4)
+        message = ' '.join(f'0x{bytes:x}' for bytes in usbData)
+        logging.info("Producer got message: %s", message)
+        queue.put(message)
 
     logging.info("Producer received event. Exiting")
 
-def consumer(queue, event):
+def consumer(queue, event, txt_file):
     """Pretend we're saving a number in the database."""
     while not event.is_set() or not queue.empty():
         message = queue.get()
-        with open("datosUSB.txt" , "w") as dataFile:
-            dataFile.write(message+'\n')
+        txt_file.write(message+'\n')
         logging.info(
             "Consumer storing message: %s (size=%d)", message, queue.qsize()
         )
@@ -62,11 +58,14 @@ if __name__ == "__main__":
                         datefmt="%H:%M:%S")
 
     pipeline = queue.Queue(maxsize=10)
-    event = threading.Event()
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-        executor.submit(producer, pipeline, event)
-        executor.submit(consumer, pipeline, event)
-
-        time.sleep(10)
-        logging.info("Main: about to set event")
-        event.set()
+    event = threading.Event() 
+    with Serial('COM31', baudrate = 1_500_000, timeout = 1) as puerto_serie:
+         puerto_serie.set_buffer_size(rx_size = 100_000, tx_size = 100_000)
+         with open("datosUSB.txt" , "w") as dataFile:
+             with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+                executor.submit(producer, pipeline, event, puerto_serie)
+                executor.submit(consumer, pipeline, event, dataFile)
+        
+                time.sleep(10)
+                logging.info("Main: about to set event")
+                event.set()
