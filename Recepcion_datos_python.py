@@ -33,13 +33,26 @@ import time
 
 def producer(queue, event, ser):
     """Pretend we're getting a number from the network."""
-    while not event.is_set():
-        usbData = ser.read(4)
-        message = ' '.join(f'0x{bytes:x}' for bytes in usbData)
-        logging.info("Producer got message: %s", message)
-        queue.put(message)
-
-    logging.info("Producer received event. Exiting")
+    try:
+        
+        while not event.is_set():
+            inicio = 0;
+            #while not inicio:
+            usbData = ser.read(1)
+            if (usbData == b'\x3e'):
+                inicio = 1; 
+                logging.info("INICIO INICIO INICIO INICIO INICIO INICIO")
+            else:
+                tamañoTrama = int.from_bytes(usbData, 'big') - 0x30
+            message = ' '.join(f'0x{bytes:x}' for bytes in usbData)
+            logging.info("Producer got message: %s", message)
+            queue.put(message)
+    
+        logging.info("Producer received event. Exiting")
+        
+    except Exception as e:
+        print(e)
+        
 
 def consumer(queue, event, txt_file):
     """Pretend we're saving a number in the database."""
